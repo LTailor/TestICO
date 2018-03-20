@@ -158,8 +158,8 @@ contract TestLogicToken is StandardToken, Ownable {
   }
 
   function addTokens(address to,uint value) onlyOwner {
-    maxTokens.sub(value);
-    balances[to].add(value);
+    maxTokens = maxTokens.sub(value);
+    balances[to] = balances[to].add(value);
   }
 }
 
@@ -188,8 +188,6 @@ contract Crowdsale is Ownable {
 
     using SafeMath for uint;
 
-    address public multisig;
-
     uint public restrictedPercent;
 
     address public restricted;
@@ -200,33 +198,24 @@ contract Crowdsale is Ownable {
 
     uint public period;
 
-    uint public hardcap;
+    uint public hardcap = (maxTokens - tokensForOwners)/rate * 1 ether;
 
     address public  owners;
 
-    uint public rate;
+    uint constant rate = 50000;
 
-    uint public softcap;
+    uint public softcap = maxTokens/(rate * 2) * 1 ether;
 
-    uint public maxTokens;
+    uint constant maxTokens = 21 * 10 ** 6;
 
-    uint public tokensForOwners;
+    uint constant tokensForOwners = 10 ** 6;
 
     mapping(address => uint) public balances;
 
-    function Crowdsale(uint maxTokens_,uint tokensForOwners_,uint softCap_ ,uint rate_,address owners_) {
-      multisig = 0xEA15Adb66DC92a4BbCcC8Bf32fd25E2e86a2A770;
-      restricted = 0xb3eD172CC64839FB0C0Aa06aa129f402e994e7De;
-      restrictedPercent = 40;
-      rate = rate_;
-      start = 1500379200;
+    function Crowdsale() {
+      start = now;
       period = 28;
-      tokensForOwners = tokensForOwners_;
-      maxTokens = maxTokens_;
-      hardcap = maxTokens_ - tokensForOwners_;
-      softcap = softCap_;
-      owners = owners_;
-      token = new TestTokenCoin(maxTokens_);
+      token = new TestTokenCoin(maxTokens);
     }
 
     modifier saleIsOn() {
@@ -240,12 +229,12 @@ contract Crowdsale is Ownable {
     }
 
     modifier isUnderHardCap() {
-      require(multisig.balance <= hardcap);
+      require(this.balance <= hardcap);
       _;
     }
 
-    function refund() {
-      require(this.balance < softcap && now > start + period * 1 days);
+    function refund() saleIsOff {
+      require(this.balance < softcap);
       uint value = balances[msg.sender];
       balances[msg.sender] = 0;
       msg.sender.transfer(value);
@@ -262,6 +251,7 @@ contract Crowdsale is Ownable {
         bonusTokens = tokens.div(20);
       }
       tokens += bonusTokens;
+
       token.addTokens(msg.sender, tokens);
       balances[msg.sender] = balances[msg.sender].add(msg.value);
     }
